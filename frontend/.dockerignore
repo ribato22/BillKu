@@ -1,0 +1,33 @@
+# .dockerignore untuk Frontend
+
+# Dependencies
+node_modules
+
+# Build output
+.next
+out
+
+# Development
+.git
+.gitignore
+*.log
+.DS_Store
+
+# Test files
+*.spec.ts
+*.test.ts
+coverage
+
+# Documentation
+*.md
+!README.md
+
+# Editor
+.vscode
+.idea
+*.swp
+*.swo
+
+# Misc
+Dockerfile
+.dockerignore

@@ -1,0 +1,1247 @@
+// Default: SQLite. For PostgreSQL, change provider to "postgresql".
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-arm64-openssl-3.0.x", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum InvoiceStatus {
+  draft
+  sent
+  partial
+  paid
+}
+
+enum PaymentMethod {
+  transfer
+  cash
+  ewallet
+  qris
+  other
+}
+
+enum DiscountType {
+  percent
+  amount
+}
+
+enum ReminderType {
+  H_MINUS_3
+  OVERDUE
+}
+
+enum ResetPeriod {
+  yearly
+  monthly
+  none
+}
+
+enum SymbolPosition {
+  prefix
+  suffix
+}
+
+enum ResourceType {
+  customer
+  invoice
+  payment
+  business
+}
+
+enum DeleteRequestStatus {
+  pending
+  approved
+  rejected
+  completed
+  canceled
+}
+
+enum PaymentGatewayProvider {
+  MIDTRANS
+  XENDIT
+  DOKU
+  IPAYMU
+  TRIPAY
+}
+
+enum UserRole {
+  owner
+  admin
+  staff
+}
+
+enum RecurringFrequency {
+  weekly
+  monthly
+  quarterly
+  yearly
+}
+
+enum PaymentLinkStatus {
+  ACTIVE
+  PAID
+  EXPIRED
+  CANCELLED
+}
+
+enum QuotationStatus {
+  draft
+  sent
+  accepted
+  rejected
+  converted
+}
+
+enum ExpenseCategory {
+  operational
+  material
+  salary
+  utilities
+  marketing
+  other
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  business     Business?
+  memberships  BusinessMember[]
+  deleteRequestsRequested DeleteRequest[] @relation("delete_request_requested_by")
+  deleteRequestsReviewed  DeleteRequest[] @relation("delete_request_reviewed_by")
+  deleteRequestsProcessed DeleteRequest[] @relation("delete_request_processed_by")
+  legalHoldsCreated       LegalHold[]     @relation("legal_hold_created_by")
+  legalHoldsReleased      LegalHold[]     @relation("legal_hold_released_by")
+  auditLogs               AuditLog[]
+
+  @@map("users")
+}
+
+model Business {
+  id                   String   @id @default(cuid())
+  userId               String   @unique @map("user_id")
+  name                 String
+  email                String?  @map("email")
+  phone                String?  @map("phone")
+  address              String?
+  city                 String?  @map("city")
+  state                String?  @map("state")
+  postalCode           String?  @map("postal_code")
+  country              String?  @default("Indonesia") @map("country")
+  taxId                String?  @map("tax_id")
+  website              String?  @map("website")
+  logoUrl              String?  @map("logo_url")
+  bankName             String?  @map("bank_name")
+  bankAccountNumber    String?  @map("bank_account_number")
+  bankAccountName      String?  @map("bank_account_name")
+  defaultCurrencyCode  String   @default("IDR") @map("default_currency_code")
+  smtpHost             String?  @map("smtp_host")
+  smtpPort             Int?     @map("smtp_port")
+  smtpUser             String?  @map("smtp_user")
+  smtpPass             String?  @map("smtp_pass")
+  smtpFrom             String?  @map("smtp_from")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  customers            Customer[]
+  products             Product[]
+  invoices             Invoice[]
+  reminderTemplates    ReminderTemplate[]
+  invoiceNumberRule    InvoiceNumberRule?
+  defaultCurrency      Currency @relation(fields: [defaultCurrencyCode], references: [code])
+  deleteRequests       DeleteRequest[]
+  legalHolds           LegalHold[]
+  whatsappConfig       WhatsAppConfig?
+  reminderSchedules    ReminderSchedule[]
+  paymentGatewayConfigs PaymentGatewayConfig[]
+  members              BusinessMember[]
+  recurringInvoices    RecurringInvoice[]
+  auditLogs            AuditLog[]
+  quotations           Quotation[]
+  deliveryNotes        DeliveryNote[]
+  expenses             Expense[]
+  invoiceTemplates     InvoiceTemplate[]
+  customFields         CustomField[]
+  salesOrders          SalesOrder[]
+  creditNotes          CreditNote[]
+  purchaseOrders       PurchaseOrder[]
+  deals                Deal[]
+  activities           Activity[]
+  customerTags         CustomerTag[]
+  posSessions          POSSession[]
+  posTransactions      POSTransaction[]
+  employees            Employee[]
+  payrolls             Payroll[]
+  attendances          Attendance[]
+  meteraiRequests      MeteraiRequest[]
+  marketplaceConns     MarketplaceConnection[]
+  marketplaceOrders    MarketplaceOrder[]
+
+  @@map("businesses")
+}
+
+model Currency {
+  code           String         @id
+  name           String
+  symbol         String
+  minorUnit      Int            @map("minor_unit")
+  symbolPosition SymbolPosition @map("symbol_position")
+
+  businesses     Business[]
+  invoices       Invoice[]
+  payments       Payment[]
+
+  @@map("currencies")
+}
+
+model Customer {
+  id         String   @id @default(cuid())
+  businessId String   @map("business_id")
+  name       String
+  phone      String?
+  email      String?
+  address    String?
+  npwp       String?  // NPWP for E-Faktur tax invoicing
+  deletedAt  DateTime? @map("deleted_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  business           Business           @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  invoices           Invoice[]
+  recurringInvoices  RecurringInvoice[]
+  quotations         Quotation[]
+  salesOrders        SalesOrder[]
+  creditNotes        CreditNote[]
+  deals              Deal[]
+  activities         Activity[]
+  tags               CustomerTag[]
+
+  @@index([businessId, name])
+  @@map("customers")
+}
+
+model Product {
+  id            String   @id @default(cuid())
+  businessId    String   @map("business_id")
+  name          String
+  price         BigInt   @default(0)
+  unit          String   @default("pcs")
+  trackStock    Boolean  @default(false) @map("track_stock")
+  currentStock  Int      @default(0) @map("current_stock")
+  lowStockAlert Int?     @map("low_stock_alert")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  business             Business             @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  items                InvoiceItem[]
+  recurringInvoiceItems RecurringInvoiceItem[]
+  quotationItems       QuotationItem[]
+  salesOrderItems      SalesOrderItem[]
+  creditNoteItems      CreditNoteItem[]
+  purchaseOrderItems   PurchaseOrderItem[]
+  posTransactionItems  POSTransactionItem[]
+
+  @@index([businessId, name])
+  @@map("products")
+}
+
+model InvoiceNumberRule {
+  id            String     @id @default(cuid())
+  businessId    String     @unique @map("business_id")
+  pattern       String
+  resetPeriod   ResetPeriod @map("reset_period")
+  lastPeriodKey String?    @map("last_period_key")
+  lastSequence  Int        @default(0) @map("last_sequence")
+  createdAt     DateTime   @default(now()) @map("created_at")
+  updatedAt     DateTime   @updatedAt @map("updated_at")
+
+  business      Business   @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@map("invoice_number_rules")
+}
+
+model Invoice {
+  id                String        @id @default(cuid())
+  businessId        String        @map("business_id")
+  customerId        String        @map("customer_id")
+  invoiceNumber     String        @map("invoice_number")
+  publicId          String        @unique @map("public_id")
+  issueDate         DateTime      @map("issue_date")
+  dueDate           DateTime      @map("due_date")
+  status            InvoiceStatus
+  currencyCode      String        @map("currency_code")
+  currencyMinorUnit Int           @map("currency_minor_unit")
+  taxEnabled        Boolean       @default(false) @map("tax_enabled")
+  taxRateBps        Int           @default(0) @map("tax_rate_bps")
+  subtotal          BigInt        @default(0)
+  discountType      DiscountType? @map("discount_type")
+  discountValue     Int           @default(0) @map("discount_value")
+  discountAmount    BigInt        @default(0) @map("discount_amount")
+  taxAmount         BigInt        @default(0) @map("tax_amount")
+  total             BigInt        @default(0)
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+
+  business          Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  customer          Customer      @relation(fields: [customerId], references: [id])
+  currency          Currency      @relation(fields: [currencyCode], references: [code])
+  items             InvoiceItem[]
+  payments          Payment[]
+  reminderLogs      ReminderLog[]
+  paymentLinks      PaymentLink[]
+  deliveryNotes     DeliveryNote[]
+  creditNotes       CreditNote[]
+
+  @@unique([businessId, invoiceNumber])
+  @@index([businessId, status])
+  @@index([businessId, dueDate])
+  @@index([customerId])
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id          String   @id @default(cuid())
+  invoiceId   String   @map("invoice_id")
+  productId   String?  @map("product_id")
+  description String
+  qty         Decimal  @default(1.0)
+  unitPrice   BigInt   @default(0) @map("unit_price")
+  total       BigInt   @default(0)
+
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  product     Product? @relation(fields: [productId], references: [id])
+
+  @@index([invoiceId])
+  @@map("invoice_items")
+}
+
+model Payment {
+  id           String        @id @default(cuid())
+  invoiceId    String        @map("invoice_id")
+  date         DateTime
+  amount       BigInt        @default(0)
+  currencyCode String        @map("currency_code")
+  method       PaymentMethod
+  note         String?
+  createdAt    DateTime      @default(now()) @map("created_at")
+
+  invoice      Invoice       @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  currency     Currency      @relation(fields: [currencyCode], references: [code])
+
+  @@index([invoiceId, date])
+  @@map("payments")
+}
+
+model ReminderTemplate {
+  id         String       @id @default(cuid())
+  businessId String       @map("business_id")
+  type       ReminderType
+  template   String
+  createdAt  DateTime     @default(now()) @map("created_at")
+  updatedAt  DateTime     @updatedAt @map("updated_at")
+
+  business   Business     @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, type])
+  @@map("reminder_templates")
+}
+
+model DeleteRequest {
+  id                 String             @id @default(cuid())
+  businessId         String             @map("business_id")
+  resourceType       ResourceType       @map("resource_type")
+  resourceId         String             @map("resource_id")
+  status             DeleteRequestStatus @default(pending)
+  reason             String?
+  requestedAt        DateTime           @default(now()) @map("requested_at")
+  requestedByUserId  String?            @map("requested_by_user_id")
+  reviewedAt         DateTime?          @map("reviewed_at")
+  reviewedByUserId   String?            @map("reviewed_by_user_id")
+  processedAt        DateTime?          @map("processed_at")
+  processedByUserId  String?            @map("processed_by_user_id")
+
+  business           Business           @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  requestedBy        User?              @relation("delete_request_requested_by", fields: [requestedByUserId], references: [id])
+  reviewedBy         User?              @relation("delete_request_reviewed_by", fields: [reviewedByUserId], references: [id])
+  processedBy        User?              @relation("delete_request_processed_by", fields: [processedByUserId], references: [id])
+
+  @@index([businessId, status])
+  @@index([businessId, resourceType, resourceId])
+  @@map("delete_requests")
+}
+
+model LegalHold {
+  id                String       @id @default(cuid())
+  businessId        String       @map("business_id")
+  resourceType      ResourceType @map("resource_type")
+  resourceId        String       @map("resource_id")
+  reason            String?
+  startAt           DateTime     @default(now()) @map("start_at")
+  endAt             DateTime?    @map("end_at")
+  createdByUserId   String?      @map("created_by_user_id")
+  releasedAt        DateTime?    @map("released_at")
+  releasedByUserId  String?      @map("released_by_user_id")
+
+  business          Business     @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  createdBy         User?        @relation("legal_hold_created_by", fields: [createdByUserId], references: [id])
+  releasedBy        User?        @relation("legal_hold_released_by", fields: [releasedByUserId], references: [id])
+
+  @@index([businessId, resourceType, resourceId])
+  @@index([businessId, releasedAt])
+  @@map("legal_holds")
+}
+
+// ===== WHATSAPP INTEGRATION =====
+
+enum WAProvider {
+  BAILEYS
+  CLOUD_API
+  FONNTE
+}
+
+enum ReminderLogStatus {
+  PENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+
+model WhatsAppConfig {
+  id            String     @id @default(cuid())
+  businessId    String     @unique @map("business_id")
+  provider      WAProvider @default(BAILEYS)
+  
+  // Baileys specific - session data stored as JSON
+  sessionData   String?    @map("session_data") // JSON string for session
+  
+  // Cloud API specific
+  phoneNumberId String?    @map("phone_number_id")
+  accessToken   String?    @map("access_token")
+  
+  // Connection status
+  isConnected   Boolean    @default(false) @map("is_connected")
+  phoneNumber   String?    @map("phone_number")
+  lastSeen      DateTime?  @map("last_seen")
+  
+  createdAt     DateTime   @default(now()) @map("created_at")
+  updatedAt     DateTime   @updatedAt @map("updated_at")
+  
+  business      Business   @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  
+  @@map("whatsapp_configs")
+}
+
+model ReminderSchedule {
+  id          String   @id @default(cuid())
+  businessId  String   @map("business_id")
+  
+  // Trigger: days relative to due date (negative = before, positive = after)
+  // e.g., -3 = 3 days before due, 1 = 1 day after due (overdue)
+  triggerDays Int      @map("trigger_days")
+  
+  // Message template with variables: {customer_name}, {invoice_number}, {amount}, {due_date}
+  template    String
+  
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  
+  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  logs        ReminderLog[]
+  
+  @@unique([businessId, triggerDays])
+  @@map("reminder_schedules")
+}
+
+model ReminderLog {
+  id          String   @id @default(cuid())
+  scheduleId  String?  @map("schedule_id")
+  invoiceId   String   @map("invoice_id")
+  
+  phoneNumber String   @map("phone_number")
+  message     String
+  status      ReminderLogStatus @default(PENDING)
+  
+  sentAt      DateTime? @map("sent_at")
+  deliveredAt DateTime? @map("delivered_at")
+  readAt      DateTime? @map("read_at")
+  error       String?
+  
+  createdAt   DateTime @default(now()) @map("created_at")
+  
+  schedule    ReminderSchedule? @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
+  invoice     Invoice           @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  
+  @@index([invoiceId])
+  @@index([scheduleId])
+  @@index([status])
+  @@map("reminder_logs")
+}
+
+model PaymentGatewayConfig {
+  id            String                 @id @default(cuid())
+  businessId    String                 @map("business_id")
+  provider      PaymentGatewayProvider
+  
+  // Credentials (encrypted in application layer)
+  serverKey     String                 @map("server_key")
+  clientKey     String?                @map("client_key")
+  merchantId    String?                @map("merchant_id")
+  
+  isActive      Boolean                @default(true) @map("is_active")
+  isSandbox     Boolean                @default(true) @map("is_sandbox")
+  
+  createdAt     DateTime               @default(now()) @map("created_at")
+  updatedAt     DateTime               @updatedAt @map("updated_at")
+
+  business      Business               @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  paymentLinks  PaymentLink[]
+
+  @@unique([businessId, provider])
+  @@map("payment_gateway_configs")
+}
+
+model PaymentLink {
+  id            String                 @id @default(cuid())
+  invoiceId     String                 @map("invoice_id")
+  configId      String                 @map("config_id")
+  
+  externalId    String?                @map("external_id")
+  paymentUrl    String                 @map("payment_url")
+  amount        BigInt
+  status        PaymentLinkStatus      @default(ACTIVE)
+  
+  expiresAt     DateTime               @map("expires_at")
+  paidAt        DateTime?              @map("paid_at")
+  webhookData   String?                @map("webhook_data")
+  
+  createdAt     DateTime               @default(now()) @map("created_at")
+  updatedAt     DateTime               @updatedAt @map("updated_at")
+
+  invoice       Invoice                @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  config        PaymentGatewayConfig   @relation(fields: [configId], references: [id])
+
+  @@index([invoiceId])
+  @@index([externalId])
+  @@index([status])
+  @@map("payment_links")
+}
+
+// ===== MULTI-USER / ROLES =====
+
+model BusinessMember {
+  id         String   @id @default(cuid())
+  businessId String   @map("business_id")
+  userId     String   @map("user_id")
+  role       UserRole @default(staff)
+  invitedBy  String?  @map("invited_by")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, userId])
+  @@map("business_members")
+}
+
+// ===== RECURRING INVOICES =====
+
+model RecurringInvoice {
+  id            String             @id @default(cuid())
+  businessId    String             @map("business_id")
+  customerId    String             @map("customer_id")
+  frequency     RecurringFrequency
+  currencyCode  String             @default("IDR") @map("currency_code")
+  taxEnabled    Boolean            @default(false) @map("tax_enabled")
+  taxRateBps    Int                @default(0) @map("tax_rate_bps")
+  nextDueDate   DateTime           @map("next_due_date")
+  dueDayOffset  Int                @default(30) @map("due_day_offset")
+  isActive      Boolean            @default(true) @map("is_active")
+  lastGenerated DateTime?          @map("last_generated")
+  createdAt     DateTime           @default(now()) @map("created_at")
+  updatedAt     DateTime           @updatedAt @map("updated_at")
+
+  business      Business           @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  customer      Customer           @relation(fields: [customerId], references: [id])
+  items         RecurringInvoiceItem[]
+
+  @@index([businessId, isActive])
+  @@map("recurring_invoices")
+}
+
+model RecurringInvoiceItem {
+  id                 String           @id @default(cuid())
+  recurringInvoiceId String           @map("recurring_invoice_id")
+  productId          String?          @map("product_id")
+  description        String
+  qty                Decimal          @default(1.0)
+  unitPrice          BigInt           @default(0) @map("unit_price")
+
+  recurringInvoice   RecurringInvoice @relation(fields: [recurringInvoiceId], references: [id], onDelete: Cascade)
+  product            Product?         @relation(fields: [productId], references: [id])
+
+  @@map("recurring_invoice_items")
+}
+
+// ===== AUDIT LOG =====
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  businessId String   @map("business_id")
+  userId     String   @map("user_id")
+  action     String   // CREATE, UPDATE, DELETE, STATUS_CHANGE
+  resource   String   // invoice, customer, product, payment, quotation, expense
+  resourceId String   @map("resource_id")
+  changes    String?  // JSON diff of changes
+  ipAddress  String?  @map("ip_address")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id])
+
+  @@index([businessId, createdAt])
+  @@index([businessId, resource])
+  @@map("audit_logs")
+}
+
+// ===== QUOTATIONS =====
+
+model Quotation {
+  id                 String          @id @default(cuid())
+  businessId         String          @map("business_id")
+  customerId         String          @map("customer_id")
+  quotationNumber    String          @map("quotation_number")
+  status             QuotationStatus @default(draft)
+  issueDate          DateTime        @map("issue_date")
+  validUntil         DateTime        @map("valid_until")
+  notes              String?
+  currencyCode       String          @default("IDR") @map("currency_code")
+  convertedInvoiceId String?         @map("converted_invoice_id")
+  createdAt          DateTime        @default(now()) @map("created_at")
+  updatedAt          DateTime        @updatedAt @map("updated_at")
+
+  business Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  customer Customer  @relation(fields: [customerId], references: [id])
+  items    QuotationItem[]
+
+  @@unique([businessId, quotationNumber])
+  @@index([businessId, status])
+  @@map("quotations")
+}
+
+model QuotationItem {
+  id          String    @id @default(cuid())
+  quotationId String    @map("quotation_id")
+  productId   String?   @map("product_id")
+  description String
+  qty         Decimal   @default(1.0)
+  unitPrice   BigInt    @default(0) @map("unit_price")
+
+  quotation Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  product   Product?  @relation(fields: [productId], references: [id])
+
+  @@map("quotation_items")
+}
+
+// ===== DELIVERY NOTES =====
+
+model DeliveryNote {
+  id           String   @id @default(cuid())
+  businessId   String   @map("business_id")
+  invoiceId    String   @map("invoice_id")
+  noteNumber   String   @map("note_number")
+  deliveryDate DateTime @map("delivery_date")
+  recipient    String
+  address      String?
+  notes        String?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  business Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  invoice  Invoice            @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  items    DeliveryNoteItem[]
+
+  @@unique([businessId, noteNumber])
+  @@map("delivery_notes")
+}
+
+model DeliveryNoteItem {
+  id             String @id @default(cuid())
+  deliveryNoteId String @map("delivery_note_id")
+  description    String
+  qty            Decimal @default(1.0)
+  unit           String  @default("pcs")
+
+  deliveryNote DeliveryNote @relation(fields: [deliveryNoteId], references: [id], onDelete: Cascade)
+
+  @@map("delivery_note_items")
+}
+
+// ===== EXPENSES =====
+
+model Expense {
+  id           String          @id @default(cuid())
+  businessId   String          @map("business_id")
+  categoryType ExpenseCategory @map("category_type")
+  description  String
+  amount       BigInt
+  currencyCode String          @default("IDR") @map("currency_code")
+  date         DateTime
+  vendorName   String?         @map("vendor_name")
+  receiptUrl   String?         @map("receipt_url")
+  notes        String?
+  createdAt    DateTime        @default(now()) @map("created_at")
+  updatedAt    DateTime        @updatedAt @map("updated_at")
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, date])
+  @@index([businessId, categoryType])
+  @@map("expenses")
+}
+
+// ===== INVOICE TEMPLATES =====
+
+model InvoiceTemplate {
+  id         String  @id @default(cuid())
+  businessId String  @map("business_id")
+  name       String
+  htmlBody   String  @map("html_body")
+  isDefault  Boolean @default(false) @map("is_default")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@map("invoice_templates")
+}
+
+// ===== CUSTOM FIELDS =====
+
+model CustomField {
+  id         String  @id @default(cuid())
+  businessId String  @map("business_id")
+  entity     String  // "invoice", "customer", "product"
+  fieldName  String  @map("field_name")
+  fieldType  String  @map("field_type") // "text", "number", "date", "select"
+  options    String? // JSON array for select type
+  isRequired Boolean @default(false) @map("is_required")
+  position   Int     @default(0)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  values   CustomFieldValue[]
+
+  @@unique([businessId, entity, fieldName])
+  @@map("custom_fields")
+}
+
+model CustomFieldValue {
+  id            String @id @default(cuid())
+  customFieldId String @map("custom_field_id")
+  entityId      String @map("entity_id")
+  value         String
+
+  customField CustomField @relation(fields: [customFieldId], references: [id], onDelete: Cascade)
+
+  @@unique([customFieldId, entityId])
+  @@map("custom_field_values")
+}
+
+// ==========================================
+// SALES ORDER
+// ==========================================
+
+enum SalesOrderStatus {
+  draft
+  confirmed
+  fulfilled
+  cancelled
+}
+
+model SalesOrder {
+  id              String           @id @default(cuid())
+  businessId      String           @map("business_id")
+  customerId      String           @map("customer_id")
+  orderNumber     String           @map("order_number")
+  status          SalesOrderStatus @default(draft)
+  orderDate       DateTime         @map("order_date")
+  expectedDate    DateTime?        @map("expected_date")
+  notes           String?
+  currencyCode    String           @default("IDR") @map("currency_code")
+  subtotal        BigInt           @default(0)
+  taxAmount       BigInt           @default(0) @map("tax_amount")
+  total           BigInt           @default(0)
+  convertedInvoiceId String?       @map("converted_invoice_id")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+
+  business Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  customer Customer         @relation(fields: [customerId], references: [id])
+  items    SalesOrderItem[]
+
+  @@unique([businessId, orderNumber])
+  @@map("sales_orders")
+}
+
+model SalesOrderItem {
+  id           String @id @default(cuid())
+  salesOrderId String @map("sales_order_id")
+  productId    String? @map("product_id")
+  description  String
+  qty          Int    @default(1)
+  unitPrice    BigInt @map("unit_price")
+  amount       BigInt @default(0)
+
+  salesOrder SalesOrder @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
+  product    Product?   @relation(fields: [productId], references: [id])
+
+  @@map("sales_order_items")
+}
+
+// ==========================================
+// CREDIT NOTE
+// ==========================================
+
+enum CreditNoteStatus {
+  draft
+  issued
+  applied
+  cancelled
+}
+
+model CreditNote {
+  id              String           @id @default(cuid())
+  businessId      String           @map("business_id")
+  customerId      String           @map("customer_id")
+  invoiceId       String?          @map("invoice_id")
+  creditNoteNumber String          @map("credit_note_number")
+  status          CreditNoteStatus @default(draft)
+  issueDate       DateTime         @map("issue_date")
+  reason          String?
+  notes           String?
+  subtotal        BigInt           @default(0)
+  taxAmount       BigInt           @default(0) @map("tax_amount")
+  total           BigInt           @default(0)
+  appliedAmount   BigInt           @default(0) @map("applied_amount")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+
+  business Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  customer Customer         @relation(fields: [customerId], references: [id])
+  invoice  Invoice?         @relation(fields: [invoiceId], references: [id])
+  items    CreditNoteItem[]
+
+  @@unique([businessId, creditNoteNumber])
+  @@map("credit_notes")
+}
+
+model CreditNoteItem {
+  id           String @id @default(cuid())
+  creditNoteId String @map("credit_note_id")
+  productId    String? @map("product_id")
+  description  String
+  qty          Int    @default(1)
+  unitPrice    BigInt @map("unit_price")
+  amount       BigInt @default(0)
+
+  creditNote CreditNote @relation(fields: [creditNoteId], references: [id], onDelete: Cascade)
+  product    Product?   @relation(fields: [productId], references: [id])
+
+  @@map("credit_note_items")
+}
+
+// ==========================================
+// PURCHASE ORDER
+// ==========================================
+
+enum PurchaseOrderStatus {
+  draft
+  sent
+  received
+  cancelled
+}
+
+model PurchaseOrder {
+  id              String              @id @default(cuid())
+  businessId      String              @map("business_id")
+  vendorName      String              @map("vendor_name")
+  vendorEmail     String?             @map("vendor_email")
+  vendorPhone     String?             @map("vendor_phone")
+  orderNumber     String              @map("order_number")
+  status          PurchaseOrderStatus @default(draft)
+  orderDate       DateTime            @map("order_date")
+  expectedDate    DateTime?           @map("expected_date")
+  notes           String?
+  subtotal        BigInt              @default(0)
+  taxAmount       BigInt              @default(0) @map("tax_amount")
+  total           BigInt              @default(0)
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime            @updatedAt @map("updated_at")
+
+  business Business              @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  items    PurchaseOrderItem[]
+
+  @@unique([businessId, orderNumber])
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id              String @id @default(cuid())
+  purchaseOrderId String @map("purchase_order_id")
+  productId       String? @map("product_id")
+  description     String
+  qty             Int    @default(1)
+  unitPrice       BigInt @map("unit_price")
+  amount          BigInt @default(0)
+
+  purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  product       Product?      @relation(fields: [productId], references: [id])
+
+  @@map("purchase_order_items")
+}
+
+// ==========================================
+// CRM (Customer Relationship Management)
+// ==========================================
+
+enum DealStage {
+  lead
+  prospect
+  proposal
+  negotiation
+  won
+  lost
+}
+
+model Deal {
+  id          String    @id @default(cuid())
+  businessId  String    @map("business_id")
+  customerId  String    @map("customer_id")
+  title       String
+  value       BigInt    @default(0)
+  stage       DealStage @default(lead)
+  probability Int       @default(0) // 0-100%
+  expectedCloseDate DateTime? @map("expected_close_date")
+  notes       String?
+  assignedTo  String?   @map("assigned_to")
+  closedAt    DateTime? @map("closed_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  business   Business    @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  customer   Customer    @relation(fields: [customerId], references: [id])
+  activities Activity[]
+
+  @@index([businessId, stage])
+  @@map("deals")
+}
+
+model Activity {
+  id         String   @id @default(cuid())
+  businessId String   @map("business_id")
+  customerId String?  @map("customer_id")
+  dealId     String?  @map("deal_id")
+  type       String   // call, email, meeting, note, task, follow_up
+  title      String
+  description String?
+  dueDate    DateTime? @map("due_date")
+  completed  Boolean  @default(false)
+  completedAt DateTime? @map("completed_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  business Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  customer Customer? @relation(fields: [customerId], references: [id])
+  deal     Deal?     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, type])
+  @@map("activities")
+}
+
+model CustomerTag {
+  id         String @id @default(cuid())
+  businessId String @map("business_id")
+  customerId String @map("customer_id")
+  tag        String
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, customerId, tag])
+  @@map("customer_tags")
+}
+
+// ==========================================
+// POS (Point of Sale / Kasir)
+// ==========================================
+
+model POSSession {
+  id           String   @id @default(cuid())
+  businessId   String   @map("business_id")
+  cashierId    String   @map("cashier_id")
+  cashierName  String   @map("cashier_name")
+  openingCash  BigInt   @default(0) @map("opening_cash")
+  closingCash  BigInt?  @map("closing_cash")
+  totalSales   BigInt   @default(0) @map("total_sales")
+  totalTx      Int      @default(0) @map("total_tx")
+  openedAt     DateTime @default(now()) @map("opened_at")
+  closedAt     DateTime? @map("closed_at")
+
+  business     Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  transactions POSTransaction[]
+
+  @@map("pos_sessions")
+}
+
+enum POSPaymentMethod {
+  cash
+  qris
+  debit_card
+  credit_card
+  transfer
+  ewallet
+}
+
+model POSTransaction {
+  id            String           @id @default(cuid())
+  businessId    String           @map("business_id")
+  sessionId     String           @map("session_id")
+  receiptNumber String           @map("receipt_number")
+  customerName  String?          @map("customer_name")
+  paymentMethod POSPaymentMethod @default(cash) @map("payment_method")
+  subtotal      BigInt           @default(0)
+  taxAmount     BigInt           @default(0) @map("tax_amount")
+  discount      BigInt           @default(0)
+  total         BigInt           @default(0)
+  cashReceived  BigInt?          @map("cash_received")
+  changeAmount  BigInt?          @map("change_amount")
+  createdAt     DateTime         @default(now()) @map("created_at")
+
+  business Business              @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  session  POSSession             @relation(fields: [sessionId], references: [id])
+  items    POSTransactionItem[]
+
+  @@unique([businessId, receiptNumber])
+  @@map("pos_transactions")
+}
+
+model POSTransactionItem {
+  id            String @id @default(cuid())
+  transactionId String @map("transaction_id")
+  productId     String? @map("product_id")
+  productName   String @map("product_name")
+  qty           Int    @default(1)
+  unitPrice     BigInt @map("unit_price")
+  discount      BigInt @default(0)
+  amount        BigInt @default(0)
+
+  transaction POSTransaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  product     Product?       @relation(fields: [productId], references: [id])
+
+  @@map("pos_transaction_items")
+}
+
+// ==========================================
+// HR / PAYROLL
+// ==========================================
+
+enum EmployeeStatus {
+  active
+  inactive
+  resigned
+}
+
+model Employee {
+  id          String         @id @default(cuid())
+  businessId  String         @map("business_id")
+  employeeId  String         @map("employee_id") // NIK/nomor karyawan
+  name        String
+  email       String?
+  phone       String?
+  position    String?
+  department  String?
+  joinDate    DateTime       @map("join_date")
+  status      EmployeeStatus @default(active)
+  baseSalary  BigInt         @default(0) @map("base_salary")
+  bankName    String?        @map("bank_name")
+  bankAccount String?        @map("bank_account")
+  npwp        String?
+  bpjsKes     String?        @map("bpjs_kes")
+  bpjsTk      String?        @map("bpjs_tk")
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+
+  business    Business    @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  payrolls    Payroll[]
+  attendances Attendance[]
+
+  @@unique([businessId, employeeId])
+  @@map("employees")
+}
+
+enum PayrollStatus {
+  draft
+  approved
+  paid
+}
+
+model Payroll {
+  id            String        @id @default(cuid())
+  businessId    String        @map("business_id")
+  employeeId    String        @map("employee_id")
+  period        String        // "2026-02" format
+  baseSalary    BigInt        @map("base_salary")
+  allowances    BigInt        @default(0) // tunjangan
+  overtime      BigInt        @default(0) // lembur
+  deductions    BigInt        @default(0) // potongan
+  bpjsKesEmployee BigInt     @default(0) @map("bpjs_kes_employee") // 1%
+  bpjsKesCompany  BigInt     @default(0) @map("bpjs_kes_company")  // 4%
+  bpjsTkEmployee  BigInt     @default(0) @map("bpjs_tk_employee")  // 2% JHT
+  bpjsTkCompany   BigInt     @default(0) @map("bpjs_tk_company")   // 3.7%+
+  pph21         BigInt        @default(0)
+  netSalary     BigInt        @default(0) @map("net_salary")
+  status        PayrollStatus @default(draft)
+  paidAt        DateTime?     @map("paid_at")
+  notes         String?
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id])
+
+  @@unique([businessId, employeeId, period])
+  @@map("payrolls")
+}
+
+enum AttendanceStatus {
+  present
+  absent
+  late
+  half_day
+  leave
+  sick
+}
+
+model Attendance {
+  id         String           @id @default(cuid())
+  businessId String           @map("business_id")
+  employeeId String           @map("employee_id")
+  date       DateTime
+  status     AttendanceStatus @default(present)
+  clockIn    DateTime?        @map("clock_in")
+  clockOut   DateTime?        @map("clock_out")
+  notes      String?
+  createdAt  DateTime         @default(now()) @map("created_at")
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id])
+
+  @@unique([businessId, employeeId, date])
+  @@map("attendances")
+}
+
+// ==========================================
+// E-METERAI (Digital Stamp Duty)
+// ==========================================
+
+enum MeteraiStatus {
+  pending
+  stamped
+  failed
+}
+
+model MeteraiRequest {
+  id           String        @id @default(cuid())
+  businessId   String        @map("business_id")
+  documentType String        @map("document_type") // invoice, quotation, contract
+  documentId   String        @map("document_id")
+  amount       BigInt        @default(10000) // Rp 10,000 per meterai
+  serialNumber String?       @map("serial_number") // from PERURI
+  status       MeteraiStatus @default(pending)
+  stampedAt    DateTime?     @map("stamped_at")
+  errorMessage String?       @map("error_message")
+  createdAt    DateTime      @default(now()) @map("created_at")
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, documentType, documentId])
+  @@map("meterai_requests")
+}
+
+// ==========================================
+// MARKETPLACE INTEGRATION
+// ==========================================
+
+enum MarketplacePlatform {
+  tokopedia
+  shopee
+  bukalapak
+  lazada
+  tiktok_shop
+}
+
+enum MarketplaceOrderStatus {
+  new_order
+  confirmed
+  processing
+  shipped
+  delivered
+  cancelled
+  returned
+}
+
+model MarketplaceConnection {
+  id           String              @id @default(cuid())
+  businessId   String              @map("business_id")
+  platform     MarketplacePlatform
+  shopName     String              @map("shop_name")
+  shopId       String?             @map("shop_id")
+  accessToken  String?             @map("access_token")
+  refreshToken String?             @map("refresh_token")
+  tokenExpiry  DateTime?           @map("token_expiry")
+  isActive     Boolean             @default(true) @map("is_active")
+  lastSyncAt   DateTime?           @map("last_sync_at")
+  createdAt    DateTime            @default(now()) @map("created_at")
+  updatedAt    DateTime            @updatedAt @map("updated_at")
+
+  business Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  orders   MarketplaceOrder[]
+
+  @@unique([businessId, platform])
+  @@map("marketplace_connections")
+}
+
+model MarketplaceOrder {
+  id              String                 @id @default(cuid())
+  businessId      String                 @map("business_id")
+  connectionId    String                 @map("connection_id")
+  platform        MarketplacePlatform
+  externalOrderId String                 @map("external_order_id")
+  buyerName       String                 @map("buyer_name")
+  buyerPhone      String?                @map("buyer_phone")
+  shippingAddress String?                @map("shipping_address")
+  status          MarketplaceOrderStatus @default(new_order)
+  subtotal        BigInt                 @default(0)
+  shippingCost    BigInt                 @default(0) @map("shipping_cost")
+  total           BigInt                 @default(0)
+  invoiceId       String?                @map("invoice_id") // linked BillKu invoice
+  syncedAt        DateTime               @default(now()) @map("synced_at")
+  createdAt       DateTime               @default(now()) @map("created_at")
+
+  business   Business              @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  connection MarketplaceConnection @relation(fields: [connectionId], references: [id])
+
+  @@unique([connectionId, externalOrderId])
+  @@map("marketplace_orders")
+}

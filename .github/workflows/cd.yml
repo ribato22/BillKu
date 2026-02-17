@@ -1,0 +1,49 @@
+name: CD — Deploy to Production
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[deploy]')
+
+    steps:
+      - name: Deploy to Server
+        uses: appleboy/ssh-action@v1
+        timeout-minutes: 10
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          port: ${{ secrets.SERVER_PORT }}
+          username: ${{ secrets.SERVER_USER }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          command_timeout: 10m
+          script: |
+            cd /opt/billku
+            echo "📥 Pulling latest changes..."
+            git pull origin main
+
+            echo "🔨 Rebuilding containers..."
+            docker compose up -d --build
+            docker image prune -f
+
+            echo "⏳ Waiting for API to be ready..."
+            for i in $(seq 1 60); do
+              if curl -sf http://localhost:4000/health > /dev/null 2>&1; then
+                echo "✅ Health check passed on attempt $i"
+                break
+              fi
+              if [ $i -eq 60 ]; then
+                echo "❌ Health check failed after 60 attempts"
+                docker compose logs --tail=50 api
+                exit 1
+              fi
+              echo "  Attempt $i/60 — waiting 5s..."
+              sleep 5
+            done
+
+            echo ""
+            echo "🚀 Deploy complete!"
+            docker compose ps

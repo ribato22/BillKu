@@ -1,0 +1,100 @@
+# ===== BILLKU DOCKER COMPOSE =====
+# Local Development & Production Simulation
+# Menjalankan Backend API dan Frontend dalam container terpisah
+
+services:
+  # ===== BACKEND API (NestJS) =====
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: billku-api
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    environment:
+      - DATABASE_URL=file:/app/data/billku.db
+      - JWT_SECRET=${JWT_SECRET:-billku-super-secret-key-change-in-production}
+      - JWT_ACCESS_EXPIRES_IN=${JWT_ACCESS_EXPIRES_IN:-15m}
+      - JWT_REFRESH_EXPIRES_IN=${JWT_REFRESH_EXPIRES_IN:-7d}
+      - PORT=4000
+      - NODE_ENV=production
+      - PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+    volumes:
+      # Persist SQLite database
+      - billku-data:/app/data
+      # Persist WhatsApp sessions
+      - billku-wa-sessions:/app/.wa-sessions
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "require('http').get('http://localhost:4000/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - billku-network
+    dns:
+      - 10.28.0.154
+      - 10.28.0.155
+      - 8.8.8.8
+
+  # ===== FRONTEND (Next.js) =====
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        BACKEND_URL: http://api:4000
+    container_name: billku-frontend
+    restart: unless-stopped
+    ports:
+      - "4001:4001"
+    environment:
+      - BACKEND_URL=http://api:4000
+      - NODE_ENV=production
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - billku-network
+
+  # ===== OPTIONAL: PostgreSQL (untuk production) =====
+  # Uncomment jika ingin menggunakan PostgreSQL sebagai database
+  # postgres:
+  #   image: postgres:16-alpine
+  #   container_name: billku-postgres
+  #   restart: unless-stopped
+  #   ports:
+  #     - "5432:5432"
+  #   environment:
+  #     - POSTGRES_DB=billku
+  #     - POSTGRES_USER=billku
+  #     - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-billku123}
+  #   volumes:
+  #     - billku-postgres:/var/lib/postgresql/data
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U billku"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+  #   networks:
+  #     - billku-network
+
+volumes:
+  billku-data:
+    name: billku-data
+  billku-wa-sessions:
+    name: billku-wa-sessions
+  # billku-postgres:
+  #   name: billku-postgres
+
+networks:
+  billku-network:
+    name: billku-network
+    driver: bridge

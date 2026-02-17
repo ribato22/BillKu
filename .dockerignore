@@ -1,0 +1,51 @@
+# .dockerignore untuk Backend
+
+# Dependencies
+node_modules
+frontend/node_modules
+
+# Build output (frontend only, backend builds inside Docker)
+frontend/.next
+frontend/out
+
+# Development
+.git
+.gitignore
+*.log
+.DS_Store
+
+# Environment files (handled separately)
+.env
+.env.local
+.env.*.local
+
+# Test files
+tests
+*.spec.ts
+*.test.ts
+coverage
+
+# Documentation
+docs
+*.md
+!README.md
+
+# Editor
+.vscode
+.idea
+*.swp
+*.swo
+
+# Database (development)
+*.db
+*.db-journal
+prisma/dev.db
+prisma/dev.db-journal
+
+# WhatsApp sessions (development)
+.wa-sessions
+
+# Misc
+Dockerfile
+docker-compose.yaml
+.dockerignore
