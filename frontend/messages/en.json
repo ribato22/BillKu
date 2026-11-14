@@ -130,7 +130,7 @@
       "confirmPassword": "Confirm Password",
       "confirmPlaceholder": "Re-enter password",
       "submit": "Sign Up Now",
-      "success": "Registration successful! Please sign in.",
+      "success": "Account created successfully.",
       "error": "Registration failed. Please try again.",
       "passwordMismatch": "Passwords do not match",
       "passwordTooShort": "Password must be at least 8 characters",

@@ -34,6 +34,12 @@ jobs:
           npm install --legacy-peer-deps
           npm run build
 
+      - name: Test registration and login in Chromium
+        working-directory: ./frontend
+        run: |
+          npx --no-install playwright install --with-deps --only-shell chromium
+          npm run test:registration
+
   docker:
     runs-on: ubuntu-latest
     needs: build
