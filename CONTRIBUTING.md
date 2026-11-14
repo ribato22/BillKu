@@ -60,6 +60,20 @@ npm run start:dev
 cd frontend && npm run dev
 ```
 
+### Browser Registration Tests
+
+From the repository root, after installing both sets of dependencies:
+
+```bash
+npx prisma generate
+npm run build
+cd frontend
+npx playwright install --only-shell chromium
+npm run test:registration
+```
+
+The test starts its own API and frontend on ports 4400 and 4401 and uses a temporary SQLite database.
+
 ### Docker Setup
 
 ```bash

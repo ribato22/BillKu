@@ -130,7 +130,7 @@
       "confirmPassword": "Konfirmasi Password",
       "confirmPlaceholder": "Ulangi password",
       "submit": "Daftar Sekarang",
-      "success": "Registrasi berhasil! Silakan login.",
+      "success": "Akun berhasil dibuat.",
       "error": "Gagal mendaftar. Silakan coba lagi.",
       "passwordMismatch": "Password tidak sama",
       "passwordTooShort": "Password minimal 8 karakter",
