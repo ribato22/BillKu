@@ -102,6 +102,8 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+# Keep the native Prisma engines so migrations can run without network access.
+COPY --from=builder /app/node_modules/@prisma/engines ./node_modules/@prisma/engines
 COPY --from=builder /app/package.json ./package.json
 
 # Copy entrypoint and seed script

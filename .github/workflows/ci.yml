@@ -12,6 +12,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -27,6 +29,9 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Test SQLite startup and v1.1.1 upgrade
+        run: sh tests/docker-migration.sh
 
       - name: Build Frontend
         working-directory: ./frontend
@@ -49,6 +54,9 @@ jobs:
 
       - name: Build Docker image
         run: docker build -t billku-api .
+
+      - name: Start Docker API with no network or existing database
+        run: sh tests/docker-offline-startup.sh billku-api
 
       - name: Build Frontend Docker image
         run: docker build -t billku-frontend ./frontend
