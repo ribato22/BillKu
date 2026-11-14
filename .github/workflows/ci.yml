@@ -12,6 +12,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -27,6 +29,9 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Test SQLite startup and v1.1.1 upgrade
+        run: sh tests/docker-migration.sh
 
       - name: Build Frontend
         working-directory: ./frontend

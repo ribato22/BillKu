@@ -244,6 +244,22 @@ See [`.env.example`](.env.example) for the complete configuration reference.
 
 ### Production with Docker
 
+#### Upgrading a v1.1.1 SQLite volume
+
+v1.1.1 created the SQLite schema without recording Prisma migrations. Before upgrading an existing volume, stop BillKu and take a backup of the SQLite database. Keep the same Compose project and volume. From the updated checkout, with the existing `.env` in place:
+
+```bash
+docker compose stop
+# Take and verify a backup of the stopped SQLite volume before continuing.
+docker compose build api
+docker compose run --rm --no-deps api baseline-v1.1.1
+docker compose up -d --build
+```
+
+The baseline command compares the existing schema to the v1.1.1 migration history and records only that history. If it reports a difference or unfinished migration, stop and review the database before proceeding. Fresh volumes can start directly with `docker compose up -d`. Startup stops if a migration fails.
+
+#### New installation
+
 ```bash
 # Clone and configure
 git clone https://github.com/ribato22/BillKu.git

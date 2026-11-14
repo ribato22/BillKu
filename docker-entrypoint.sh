@@ -3,17 +3,16 @@ set -e
 
 echo "🚀 Starting BillKu API..."
 
-# Run database migrations
-echo "📦 Running database migrations..."
-npx prisma migrate deploy || true
+if [ "${1:-}" = "baseline-v1.1.1" ]; then
+  exec node prisma/baseline-v1.1.1.js
+fi
 
-# Push any schema changes not covered by migrations (e.g. new fields)
-echo "📦 Syncing schema..."
-npx prisma db push --accept-data-loss 2>/dev/null || true
+echo "📦 Running database migrations..."
+./node_modules/.bin/prisma migrate deploy
 
 # Seed currencies
 echo "🌱 Seeding initial data..."
-node /app/prisma/seed-currencies.js
+node prisma/seed-currencies.js
 
 # Start the application
 echo "✅ Starting application..."
