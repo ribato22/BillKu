@@ -55,5 +55,8 @@ jobs:
       - name: Build Docker image
         run: docker build -t billku-api .
 
+      - name: Start Docker API with no network or existing database
+        run: sh tests/docker-offline-startup.sh billku-api
+
       - name: Build Frontend Docker image
         run: docker build -t billku-frontend ./frontend
