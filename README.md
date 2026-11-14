@@ -279,6 +279,24 @@ docker compose ps
 curl http://localhost:4000/health
 ```
 
+### Cloudflare Workers frontend
+
+Build the Next.js frontend from `frontend/`. For the `billku` Worker, set the Cloudflare build root to `frontend`, the build command to `npm run build:workers`, and the deploy command to `npx wrangler deploy`. Set the Worker's runtime variable `BACKEND_URL` to a separate HTTPS origin that Cloudflare can reach and that routes to the Docker API. Use the origin alone, for example `https://api.example.com`. Browser requests to `/api/*` stay on the frontend domain and are forwarded to the backend, including the authentication cookie.
+
+To test locally, start the Docker API with a disposable database and expose it on `127.0.0.1:4400`. Then run the frontend from `frontend/`:
+
+```bash
+npm ci
+npm run build:workers
+npm run preview:workers -- --ip 127.0.0.1 --port 4401 --var BACKEND_URL:http://127.0.0.1:4400
+```
+
+With Chromium installed for Playwright, run the browser regression in a separate terminal from `frontend/`:
+
+```bash
+BILLKU_TEST_BASE_URL=http://127.0.0.1:4401 npm run test:registration
+```
+
 ### Production with Nginx (Recommended)
 
 For production deployments, use Nginx as a reverse proxy with SSL:

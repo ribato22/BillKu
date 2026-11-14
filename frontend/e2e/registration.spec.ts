@@ -20,13 +20,17 @@ test("a browser registration creates an account that can sign in independently",
   await expect(page).toHaveURL(/\/dashboard$/);
   await expect(page.getByText(businessName, { exact: true })).toBeVisible();
 
-  const freshSession = await browser.newContext({ baseURL });
+  const freshSession = await browser.newContext({ baseURL, serviceWorkers: "block" });
   try {
     const login = await freshSession.newPage();
     await login.goto("/login");
     await login.locator("#email").fill(email);
     await login.locator("#password").fill(password);
     await login.locator("button[type=submit]").click();
+    await expect(login).toHaveURL(/\/dashboard$/);
+    await expect(login.getByText(businessName, { exact: true })).toBeVisible();
+
+    await login.reload();
     await expect(login).toHaveURL(/\/dashboard$/);
     await expect(login.getByText(businessName, { exact: true })).toBeVisible();
   } finally {

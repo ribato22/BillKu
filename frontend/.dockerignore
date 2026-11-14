@@ -6,6 +6,9 @@ node_modules
 # Build output
 .next
 out
+.open-next
+.wrangler
+.dev.vars*
 
 # Development
 .git

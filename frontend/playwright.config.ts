@@ -1,7 +1,8 @@
 import { defineConfig } from "@playwright/test";
 
 const api = "http://127.0.0.1:4400";
-const frontend = "http://127.0.0.1:4401";
+const externalFrontend = process.env.BILLKU_TEST_BASE_URL;
+const frontend = externalFrontend || "http://127.0.0.1:4401";
 
 export default defineConfig({
   testDir: "./e2e",
@@ -9,7 +10,7 @@ export default defineConfig({
   timeout: 60_000,
   expect: { timeout: 15_000 },
   use: { baseURL: frontend, serviceWorkers: "block" },
-  webServer: [
+  webServer: externalFrontend ? undefined : [
     {
       name: "BillKu API",
       cwd: "..",

@@ -5,6 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:workers": "opennextjs-cloudflare build",
+    "preview:workers": "wrangler dev --local",
     "start": "next start",
     "lint": "eslint",
     "test:registration": "sh e2e/run-registration.sh"
@@ -21,7 +23,7 @@
     "clsx": "^2.1.1",
     "dexie": "^4.3.0",
     "lucide-react": "^0.563.0",
-    "next": "16.1.6",
+    "next": "16.4.6",
     "next-intl": "^4.8.2",
     "next-themes": "^0.4.6",
     "prismjs": "^1.30.0",
@@ -38,6 +40,7 @@
     "zustand": "^5.0.11"
   },
   "devDependencies": {
+    "@opennextjs/cloudflare": "1.20.17",
     "@playwright/test": "1.65.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
@@ -45,9 +48,10 @@
     "@types/react-dom": "^19",
     "babel-plugin-react-compiler": "1.0.0",
     "eslint": "^9",
-    "eslint-config-next": "16.1.6",
+    "eslint-config-next": "16.4.6",
     "tailwindcss": "^4",
     "tw-animate-css": "^1.4.0",
-    "typescript": "^5"
+    "typescript": "^5",
+    "wrangler": "4.162.0"
   }
 }
